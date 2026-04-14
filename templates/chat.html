@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Assistant</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f7f7f8;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      color: #1a1a1a;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo {
+      width: 28px; height: 28px;
+      background: #10a37f;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo svg { width: 16px; height: 16px; fill: #fff; }
+    header h1 { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+
+    /* ── Message area ── */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .msg-wrap {
+      display: flex;
+      justify-content: flex-start;
+      padding: 6px 24px;
+    }
+    .msg-wrap.user { justify-content: flex-end; }
+
+    .bubble {
+      max-width: 70%;
+      padding: 12px 16px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .bubble.assistant {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px 18px 18px 18px;
+      color: #1a1a1a;
+    }
+    .bubble.user {
+      background: #10a37f;
+      color: #fff;
+      border-radius: 18px 18px 4px 18px;
+    }
+
+    /* typing indicator */
+    .typing { display: flex; gap: 4px; padding: 14px 16px; }
+    .typing span {
+      width: 6px; height: 6px;
+      background: #aaa;
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: .2s; }
+    .typing span:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+    /* ── Turn counter ── */
+    #turn-bar {
+      text-align: center;
+      font-size: 12px;
+      color: #888;
+      padding: 4px 0 8px;
+    }
+
+    /* ── Input area ── */
+    #input-area {
+      background: #fff;
+      border-top: 1px solid #e5e5e5;
+      padding: 16px 24px;
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    textarea {
+      flex: 1;
+      border: 1px solid #d9d9d9;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      line-height: 1.5;
+      max-height: 120px;
+      transition: border-color .15s;
+    }
+    textarea:focus { border-color: #10a37f; }
+    button#send-btn {
+      background: #10a37f;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    button#send-btn:disabled { background: #ccc; cursor: not-allowed; }
+    button#send-btn:not(:disabled):hover { background: #0d8f6e; }
+
+    /* ── Done screen ── */
+    #done-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 16px;
+      padding: 40px;
+      text-align: center;
+    }
+    #done-screen h2 { font-size: 20px; font-weight: 600; }
+    #done-screen p  { color: #555; font-size: 14px; max-width: 360px; line-height: 1.6; }
+    .code-box {
+      background: #f0faf6;
+      border: 1px solid #10a37f;
+      border-radius: 10px;
+      padding: 14px 28px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #0d8f6e;
+    }
+    .return-btn {
+      display: inline-block;
+      margin-top: 8px;
+      background: #10a37f;
+      color: #fff;
+      text-decoration: none;
+      padding: 10px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+  </div>
+  <h1>AI Assistant</h1>
+</header>
+
+<div id="messages"></div>
+<div id="turn-bar">Turns remaining: <span id="turns-left">{{ max_turns }}</span></div>
+
+<div id="input-area">
+  <div class="input-row">
+    <textarea id="user-input" rows="1" placeholder="Message AI Assistant…"></textarea>
+    <button id="send-btn">Send</button>
+  </div>
+</div>
+
+<div id="done-screen">
+  <h2>Conversation complete</h2>
+  <p>Thank you for chatting. Please record your completion code and return to the survey.</p>
+  <div class="code-box" id="completion-code"></div>
+  <a id="return-link" href="#" class="return-btn">Return to survey →</a>
+</div>
+
+<script>
+  const SESSION_ID     = "{{ session_id }}";
+  const PARTICIPANT_ID = "{{ participant_id }}";
+  const MAX_TURNS      = {{ max_turns }};
+  // ← replace with your actual Qualtrics post-survey URL (include ?pid= parameter)
+  const RETURN_URL = "https://ucdavis.co1.qualtrics.com/jfe/form/SV_2cbrFh9QghzcsPs?pid=" + PARTICIPANT_ID;
+
+  let turnsLeft = MAX_TURNS;
+
+  const messagesEl  = document.getElementById("messages");
+  const inputEl     = document.getElementById("user-input");
+  const sendBtn     = document.getElementById("send-btn");
+  const turnsLeftEl = document.getElementById("turns-left");
+
+  function addBubble(role, text) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg-wrap " + role;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble " + role;
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return wrap;
+  }
+
+  function showTyping() {
+    const wrap = document.createElement("div");
+    wrap.className = "msg-wrap assistant";
+    wrap.id = "typing-indicator";
+    wrap.innerHTML = '<div class="bubble assistant typing"><span></span><span></span><span></span></div>';
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function removeTyping() {
+    const el = document.getElementById("typing-indicator");
+    if (el) el.remove();
+  }
+
+  function generateCode(pid) {
+    // Simple deterministic code so Qualtrics can verify
+    return "EXP-" + pid.slice(-4).toUpperCase() + "-" + Math.floor(Math.random() * 9000 + 1000);
+  }
+
+  function showDone() {
+    document.getElementById("input-area").style.display  = "none";
+    document.getElementById("turn-bar").style.display    = "none";
+    document.getElementById("messages").style.display    = "none";
+    const done = document.getElementById("done-screen");
+    done.style.display = "flex";
+    document.getElementById("completion-code").textContent = generateCode(PARTICIPANT_ID);
+    document.getElementById("return-link").href = RETURN_URL;
+  }
+
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+    sendBtn.disabled = true;
+
+    addBubble("user", text);
+    showTyping();
+
+    try {
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          session_id: SESSION_ID,
+          participant_id: PARTICIPANT_ID
+        })
+      });
+      const data = await res.json();
+      removeTyping();
+
+      if (data.reply) {
+        addBubble("assistant", data.reply);
+        turnsLeft = data.turns_left;
+        turnsLeftEl.textContent = turnsLeft;
+      }
+
+      if (data.done) {
+        setTimeout(showDone, 1200);
+      } else {
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+
+    } catch (err) {
+      removeTyping();
+      addBubble("assistant", "Something went wrong. Please refresh and try again.");
+      sendBtn.disabled = false;
+    }
+  }
+
+  sendBtn.addEventListener("click", sendMessage);
+  inputEl.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  inputEl.addEventListener("input", () => {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+  });
+
+  // Opening message from assistant
+  window.addEventListener("DOMContentLoaded", () => {
+    addBubble("assistant", "Hello! I'm an AI assistant. Feel free to ask me anything.");
+  });
+</script>
+</body>
+</html>
