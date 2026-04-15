@@ -8,6 +8,7 @@ import csv
 import io
 
 app = Flask(__name__)
+init_db()
 
 # ── Config ──────────────────────────────────────────────────────────────────
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
