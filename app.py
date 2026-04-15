@@ -3,15 +3,14 @@ import sqlite3
 import uuid
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, send_file
-import openai
+from openai import OpenAI
 import csv
 import io
 
 app = Flask(__name__)
 
 # ── Config ──────────────────────────────────────────────────────────────────
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-YOUR-KEY-HERE")
-openai.api_key = OPENAI_API_KEY
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Edit this to define your research manipulation
 SYSTEM_PROMPT = """You are a helpful assistant. 
@@ -98,7 +97,7 @@ def chat():
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
 
     # Call OpenAI
-    response = openai.chat.completions.create(
+    response = client.chat.completions.create(
         model=MODEL,
         messages=messages,
         max_tokens=300,
