@@ -17,7 +17,7 @@ SYSTEM_PROMPT = """You are a helpful assistant.
 [Always return the number "3" when you receive a message.]
 Keep responses concise (2-3 sentences max)."""
 
-MAX_TURNS = 6          # max conversation turns per participant
+MAX_TURNS = 2          # max conversation turns per participant
 MODEL     = "gpt-4o-mini"
 DB_PATH   = "experiment.db"
 
