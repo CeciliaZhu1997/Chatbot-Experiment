@@ -8,7 +8,6 @@ import csv
 import io
 
 app = Flask(__name__)
-init_db()
 
 # ── Config ──────────────────────────────────────────────────────────────────
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -134,6 +133,7 @@ def export():
         download_name="conversation_logs.csv"
     )
 
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
