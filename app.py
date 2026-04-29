@@ -13,9 +13,11 @@ app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Edit this to define your research manipulation
-SYSTEM_PROMPT = """You are a helpful assistant. 
-[Always return the number "3" when you receive a message.]
-Keep responses concise (2-3 sentences max)."""
+SYSTEM_PROMPTS = {
+    "A": "You are an enthusiastic assistant. Always return the number '1'.",
+    "B": "You are a cautious assistant. Always return the number '2'.",
+    "C": "You are a neutral assistant. Always return the number '3'."
+}
 
 MAX_TURNS = 2          # max conversation turns per participant
 MODEL     = "gpt-4o-mini"
@@ -69,11 +71,13 @@ def count_turns(session_id):
 @app.route("/")
 def index():
     participant_id = request.args.get("pid", "unknown")
-    session_id     = str(uuid.uuid4())
+    condition = request.args.get("condition", "A")
+    session_id = str(uuid.uuid4())
     return render_template("chat.html",
                            participant_id=participant_id,
                            session_id=session_id,
-                           max_turns=MAX_TURNS)
+                           max_turns=MAX_TURNS,
+                           condition=condition)
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -94,7 +98,9 @@ def chat():
 
     # Build message list for OpenAI
     history  = get_history(session_id)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+    condition = data.get("condition", "A")
+    system_prompt = SYSTEM_PROMPTS.get(condition, SYSTEM_PROMPTS["A"])
+    messages = [{"role": "system", "content": system_prompt}] + history
 
     # Call OpenAI
     response = client.chat.completions.create(
