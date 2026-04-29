@@ -196,6 +196,7 @@
 
 <script>
   const SESSION_ID     = "{{ session_id }}";
+  const CONDITION = "{{ condition }}";
   const PARTICIPANT_ID = "{{ participant_id }}";
   const MAX_TURNS      = {{ max_turns }};
   // ← replace with your actual Qualtrics post-survey URL (include ?pid= parameter)
@@ -267,8 +268,9 @@
         body: JSON.stringify({
           message: text,
           session_id: SESSION_ID,
-          participant_id: PARTICIPANT_ID
-        })
+          participant_id: PARTICIPANT_ID,
+          condition: CONDITION
+})
       });
       const data = await res.json();
       removeTyping();
