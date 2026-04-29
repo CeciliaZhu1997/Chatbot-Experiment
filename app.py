@@ -12,14 +12,13 @@ app = Flask(__name__)
 # ── Config ──────────────────────────────────────────────────────────────────
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Edit this to define your research manipulation
 SYSTEM_PROMPTS = {
     "A": "You are an enthusiastic assistant. Always return the number '1'.",
     "B": "You are a cautious assistant. Always return the number '2'.",
     "C": "You are a neutral assistant. Always return the number '3'."
 }
 
-MAX_TURNS = 2          # max conversation turns per participant
+MAX_TURNS = 2
 MODEL     = "gpt-4o-mini"
 DB_PATH   = "experiment.db"
 
@@ -28,23 +27,24 @@ def init_db():
     con = sqlite3.connect(DB_PATH)
     con.execute("""
         CREATE TABLE IF NOT EXISTS messages (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id  TEXT NOT NULL,
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id     TEXT NOT NULL,
             participant_id TEXT,
-            role        TEXT NOT NULL,
-            content     TEXT NOT NULL,
-            turn        INTEGER,
-            timestamp   TEXT NOT NULL
+            condition      TEXT,
+            role           TEXT NOT NULL,
+            content        TEXT NOT NULL,
+            turn           INTEGER,
+            timestamp      TEXT NOT NULL
         )
     """)
     con.commit()
     con.close()
 
-def save_message(session_id, participant_id, role, content, turn):
+def save_message(session_id, participant_id, condition, role, content, turn):
     con = sqlite3.connect(DB_PATH)
     con.execute(
-        "INSERT INTO messages (session_id, participant_id, role, content, turn, timestamp) VALUES (?,?,?,?,?,?)",
-        (session_id, participant_id, role, content, turn, datetime.utcnow().isoformat())
+        "INSERT INTO messages (session_id, participant_id, condition, role, content, turn, timestamp) VALUES (?,?,?,?,?,?,?)",
+        (session_id, participant_id, condition, role, content, turn, datetime.utcnow().isoformat())
     )
     con.commit()
     con.close()
@@ -71,8 +71,8 @@ def count_turns(session_id):
 @app.route("/")
 def index():
     participant_id = request.args.get("pid", "unknown")
-    condition = request.args.get("condition", "A")
-    session_id = str(uuid.uuid4())
+    condition      = request.args.get("condition", "A")
+    session_id     = str(uuid.uuid4())
     return render_template("chat.html",
                            participant_id=participant_id,
                            session_id=session_id,
@@ -85,6 +85,7 @@ def chat():
     user_msg       = data.get("message", "").strip()
     session_id     = data.get("session_id")
     participant_id = data.get("participant_id", "unknown")
+    condition      = data.get("condition", "A")
 
     if not user_msg or not session_id:
         return jsonify({"error": "missing fields"}), 400
@@ -93,16 +94,12 @@ def chat():
     if turns >= MAX_TURNS:
         return jsonify({"reply": None, "done": True})
 
-    # Save user message
-    save_message(session_id, participant_id, "user", user_msg, turns + 1)
+    save_message(session_id, participant_id, condition, "user", user_msg, turns + 1)
 
-    # Build message list for OpenAI
-    history  = get_history(session_id)
-    condition = data.get("condition", "A")
+    history       = get_history(session_id)
     system_prompt = SYSTEM_PROMPTS.get(condition, SYSTEM_PROMPTS["A"])
-    messages = [{"role": "system", "content": system_prompt}] + history
+    messages      = [{"role": "system", "content": system_prompt}] + history
 
-    # Call OpenAI
     response = client.chat.completions.create(
         model=MODEL,
         messages=messages,
@@ -111,24 +108,22 @@ def chat():
     )
     reply = response.choices[0].message.content.strip()
 
-    # Save assistant reply
-    save_message(session_id, participant_id, "assistant", reply, turns + 1)
+    save_message(session_id, participant_id, condition, "assistant", reply, turns + 1)
 
     done = (turns + 1) >= MAX_TURNS
     return jsonify({"reply": reply, "done": done, "turns_left": MAX_TURNS - turns - 1})
 
 @app.route("/export")
 def export():
-    """Download all conversation logs as CSV (protect this in production)."""
     con  = sqlite3.connect(DB_PATH)
     rows = con.execute(
-        "SELECT session_id, participant_id, role, content, turn, timestamp FROM messages ORDER BY session_id, id"
+        "SELECT session_id, participant_id, condition, role, content, turn, timestamp FROM messages ORDER BY session_id, id"
     ).fetchall()
     con.close()
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["session_id", "participant_id", "role", "content", "turn", "timestamp"])
+    writer.writerow(["session_id", "participant_id", "condition", "role", "content", "turn", "timestamp"])
     writer.writerows(rows)
     output.seek(0)
 
